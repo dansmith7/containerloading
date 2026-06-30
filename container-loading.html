@@ -539,6 +539,8 @@ function renderVisual(containers){
 }
 
 function drawContainerSVG(container){
+  if(container.mixed) return drawMixedContainerSVG(container);
+
   const W=240, H=320;
   const pad=10, colGap=8;
   const colW=(W-pad*2-colGap)/2;
@@ -615,6 +617,55 @@ function drawContainerSVG(container){
 
   svg+=`</svg>`;
   return svg;
+}
+
+function drawMixedContainerSVG(container){
+  const W=240, H=320;
+  const pad=10;
+  const innerY=pad+14, innerH=H-pad*2-20;
+  const innerX=pad, innerW=W-pad*2;
+  const tierGap=6;
+  const tierH=(innerH-tierGap)/2;
+  const topY=innerY;
+  const bottomY=innerY+tierH+tierGap;
+  const cargo65=container.cargo.filter(c=>c.size==='65');
+  const cargo86=container.cargo.filter(c=>c.size==='86');
+  const qty65=cargo65.reduce((s,c)=>s+c.qty,0);
+  const qty86=cargo86.reduce((s,c)=>s+c.qty,0);
+
+  let svg=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="container-svg">`;
+
+  svg+=`<rect x="2" y="2" width="${W-4}" height="${H-4}" rx="6" fill="#b0bec5" stroke="#455a64" stroke-width="2.5"/>`;
+  svg+=`<rect x="${innerX}" y="${innerY}" width="${innerW}" height="${innerH}" rx="3" fill="#eceff1"/>`;
+  svg+=`<rect x="${pad}" y="${pad}" width="${W-pad*2}" height="12" rx="2" fill="#546e7a"/>`;
+  svg+=`<text x="${W/2}" y="${pad+9}" text-anchor="middle" font-size="8" fill="white" font-weight="700" letter-spacing="1">40HQ MIX</text>`;
+
+  drawMixedTier('65"', 'Верхний ярус', qty65, cargo65, topY, tierH, COLORS['65']);
+  drawMixedTier('86"', 'Нижний ярус', qty86, cargo86, bottomY, tierH, COLORS['86']);
+
+  svg+=`<line x1="${innerX}" y1="${bottomY-3}" x2="${innerX+innerW}" y2="${bottomY-3}" stroke="#fff" stroke-width="2" stroke-dasharray="5,3" opacity=".85"/>`;
+  svg+=`<text x="${W-pad-4}" y="${bottomY-8}" text-anchor="end" font-size="8" fill="#546e7a" font-weight="700">граница ярусов</text>`;
+
+  svg+=`<rect x="${pad}" y="${innerY+innerH+2}" width="${W-pad*2}" height="6" rx="2" fill="#78909c"/>`;
+  svg+=`<line x1="${W/2}" y1="${innerY+innerH+2}" x2="${W/2}" y2="${innerY+innerH+8}" stroke="#546e7a" stroke-width="1.5"/>`;
+  svg+=`</svg>`;
+  return svg;
+
+  function drawMixedTier(sizeLabel, tierLabel, qty, cargoList, y, h, color){
+    svg+=`<rect x="${innerX+1}" y="${y}" width="${innerW-2}" height="${h}" rx="4" fill="${color}" opacity=".92"/>`;
+    svg+=`<text x="${innerX+10}" y="${y+18}" font-size="10" fill="white" font-weight="800">${sizeLabel} ${tierLabel}</text>`;
+    svg+=`<text x="${innerX+innerW-10}" y="${y+18}" text-anchor="end" font-size="12" fill="white" font-weight="800">${qty} шт.</text>`;
+
+    const rows = cargoList.length || 1;
+    const rowH = Math.min(24, (h-42)/rows);
+    cargoList.forEach((cargo,idx)=>{
+      const itemY = y+34+idx*rowH;
+      const name = cargo.label.replace(` ${cargo.size}"`, '');
+      svg+=`<rect x="${innerX+10}" y="${itemY}" width="${innerW-20}" height="${rowH-4}" rx="3" fill="rgba(255,255,255,.18)"/>`;
+      svg+=`<text x="${innerX+18}" y="${itemY+rowH/2+2}" font-size="9" fill="white" font-weight="700">${name}</text>`;
+      svg+=`<text x="${innerX+innerW-18}" y="${itemY+rowH/2+2}" text-anchor="end" font-size="9" fill="white" font-weight="800">${cargo.qty}</text>`;
+    });
+  }
 }
 
 function renderTable(containers){
