@@ -264,6 +264,11 @@ function getItemSizes(type){
   return Object.keys(cap).filter(k=>k!=='any');
 }
 
+function getQtyStep(type, size){
+  const cap = (CAPACITY[type] || CAPACITY.platform)[size] || 2;
+  return Math.max(1, cap / 2);
+}
+
 function renderList(){
   const el = document.getElementById('cargo-list');
   if(items.length===0){
@@ -271,6 +276,7 @@ function renderList(){
     return;
   }
   el.innerHTML = items.map((item,idx)=>{
+    const qtyStep = getQtyStep(item.type, item.size);
     const sizeOpts = getItemSizes(item.type).map(s=>
       `<option value="${s}" ${item.size===s?'selected':''}>${s}"</option>`
     ).join('');
@@ -297,7 +303,7 @@ function renderList(){
         </div>
         <div class="field-group">
           <label>Кол-во</label>
-          <input type="number" id="qty-${item.id}" min="0" value="${item.qty||''}"
+          <input type="number" id="qty-${item.id}" min="0" step="${qtyStep}" value="${item.qty||''}"
             placeholder="0"
             onchange="updateItem(${item.id},'qty',+this.value)"
             oninput="updateItem(${item.id},'qty',+this.value)">
@@ -355,7 +361,6 @@ function calculate(){
       const mixPlan = findBestMixPlan(groups, size65Keys, size86Keys);
       if(mixPlan && mixPlan.saving>0){
         groups = mixPlan.remainingGroups;
-        msgs.push(`Смешанная загрузка 65"+86": сэкономлено <strong>${mixPlan.saving} конт.</strong> по сравнению с чистой загрузкой`);
         for(const mixedCargo of mixPlan.mixedContainers){
           containers.push({
             id: containers.length+1, type:'40HQ', mixed:true,
