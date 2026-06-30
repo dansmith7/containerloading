@@ -781,23 +781,7 @@ function exportTableToExcel(){
     return;
   }
 
-  const rows = [
-    ['№ Конт.', 'Тип', 'Состав груза', 'Кол-во', 'Ёмкость', 'Заполнено'],
-  ];
-
-  currentContainers.forEach(c=>{
-    const pct = Math.round(c.filled/c.capacity*100) + '%';
-    c.cargo.forEach(cl=>{
-      rows.push([
-        c.num,
-        c.mixed ? 'МИКС' : 'Чистый',
-        cl.label,
-        cl.qty,
-        c.capacity,
-        pct,
-      ]);
-    });
-  });
+  const rows = buildExcelMatrixRows();
 
   const tableRows = rows.map((row,idx)=>
     '<tr>' + row.map(cell=>idx===0
@@ -814,7 +798,7 @@ function exportTableToExcel(){
 table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px}
 th{background:#e8edf8;font-weight:700}
 th,td{border:1px solid #b7c4d6;padding:6px 10px;text-align:left}
-td:nth-child(4),td:nth-child(5),td:nth-child(6){text-align:right}
+td:not(:first-child){text-align:right}
 </style>
 </head>
 <body>
@@ -832,6 +816,36 @@ td:nth-child(4),td:nth-child(5),td:nth-child(6){text-align:right}
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function buildExcelMatrixRows(){
+  const cargoOrder = [];
+  const matrix = {};
+
+  currentContainers.forEach((container, containerIdx)=>{
+    container.cargo.forEach(cargo=>{
+      const key = getExportCargoName(cargo.label);
+      if(!matrix[key]){
+        matrix[key] = {
+          total: 0,
+          values: Array(currentContainers.length).fill(''),
+        };
+        cargoOrder.push(key);
+      }
+      matrix[key].total += cargo.qty;
+      matrix[key].values[containerIdx] = (matrix[key].values[containerIdx] || 0) + cargo.qty;
+    });
+  });
+
+  const header = ['', 'Итого', ...currentContainers.map((_,idx)=>`Cont${idx+1}`)];
+  return [
+    header,
+    ...cargoOrder.map(key=>[key, matrix[key].total, ...matrix[key].values]),
+  ];
+}
+
+function getExportCargoName(label){
+  return label.replace('"', '').trim();
 }
 
 function escapeHtml(value){
