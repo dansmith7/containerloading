@@ -137,6 +137,7 @@ table.rt td.num{text-align:right;font-weight:700;color:#0d47a1}
 }
 
 @media (max-width: 720px){
+  html,body{overflow-x:hidden}
   body{background:#f4f6fa;font-size:13px}
   .header{padding:12px 14px;gap:10px;align-items:flex-start}
   .header-icon{font-size:24px;line-height:1}
@@ -163,16 +164,22 @@ table.rt td.num{text-align:right;font-weight:700;color:#0d47a1}
   .sum-card .val{font-size:23px}
   .sum-card .lbl{font-size:10px}
 
-  .tab-bar{padding:0 10px;gap:2px;overflow-x:auto;scrollbar-width:none}
+  .tab-bar{padding:0 10px;gap:2px;overflow:visible;flex-wrap:wrap;scrollbar-width:none}
   .tab-bar::-webkit-scrollbar{display:none}
-  .tab{flex:0 0 auto;padding:11px 10px;font-size:12px;white-space:nowrap}
-  .tab-spacer{flex:1 0 10px}
-  .btn-export-xls{flex:0 0 auto;padding:8px 10px;font-size:12px;white-space:nowrap}
+  .tab{flex:1 1 auto;padding:11px 8px;font-size:12px;white-space:nowrap;text-align:center}
+  .tab-spacer{display:none}
+  .btn-export-xls{flex:0 0 auto;margin:7px 0 7px auto;padding:8px 10px;font-size:12px;white-space:nowrap}
   .tab-content{padding:12px}
 
-  .result-table-wrap{margin:0 -12px;padding:0 12px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  table.rt{min-width:680px;font-size:12px}
-  table.rt th,table.rt td{padding:8px 10px}
+  .result-table-wrap{margin:0;overflow:visible}
+  table.rt{width:100%;table-layout:fixed;font-size:12px}
+  table.rt th,table.rt td{padding:8px 7px;word-break:break-word}
+  table.rt .col-container{width:76px}
+  table.rt .col-type{width:64px}
+  table.rt .col-qty{width:58px}
+  table.rt .col-capacity,table.rt .col-fill{display:none}
+  table.rt td.num{text-align:right}
+  .color-pill{margin-right:4px}
 
   .containers-grid{grid-template-columns:1fr;gap:12px}
   .con-card{border-radius:8px}
@@ -193,6 +200,12 @@ table.rt td.num{text-align:right;font-weight:700;color:#0d47a1}
   .header-meta{display:none}
   .summary-bar{grid-template-columns:1fr 1fr}
   .field-row{grid-template-columns:1fr 88px}
+  .tab{font-size:11px;padding:10px 6px}
+  table.rt{font-size:11px}
+  table.rt th,table.rt td{padding:7px 5px}
+  table.rt .col-container{width:68px}
+  table.rt .col-type{width:56px}
+  table.rt .col-qty{width:52px}
   .containers-grid{margin:0 -2px}
   .con-card-head{gap:8px}
   .con-tag{font-size:10px;padding:4px 7px}
@@ -754,7 +767,7 @@ function renderTable(containers){
   const wrap = document.getElementById('result-table-wrap');
   let html=`<table class="rt">
   <thead><tr>
-    <th>№ Конт.</th><th>Тип</th><th>Состав груза</th><th>Кол-во</th><th>Ёмкость</th><th>Заполнено</th>
+    <th class="col-container">№ Конт.</th><th class="col-type">Тип</th><th class="col-cargo">Состав груза</th><th class="col-qty">Кол-во</th><th class="col-capacity">Ёмкость</th><th class="col-fill">Заполнено</th>
   </tr></thead><tbody>`;
 
   for(const c of containers){
@@ -762,12 +775,12 @@ function renderTable(containers){
     const rowspan=c.cargo.length;
     c.cargo.forEach((cl,idx)=>{
       html+=`<tr>`;
-      if(idx===0) html+=`<td rowspan="${rowspan}" style="font-weight:700;color:#0d47a1">${c.num}</td>
-        <td rowspan="${rowspan}">${c.mixed?'МИКС':'Чистый'}</td>`;
-      html+=`<td><span class="color-pill" style="background:${cl.color}"></span>${cl.label}</td>
-        <td class="num">${cl.qty.toLocaleString('ru')}</td>`;
-      if(idx===0) html+=`<td rowspan="${rowspan}" class="num">${c.capacity}</td>
-        <td rowspan="${rowspan}" class="num" style="color:${pct>=90?'#2e7d32':'#e65100'}">${pct}%</td>`;
+      if(idx===0) html+=`<td class="col-container" rowspan="${rowspan}" style="font-weight:700;color:#0d47a1">${c.num}</td>
+        <td class="col-type" rowspan="${rowspan}">${c.mixed?'МИКС':'Чистый'}</td>`;
+      html+=`<td class="col-cargo"><span class="color-pill" style="background:${cl.color}"></span>${cl.label}</td>
+        <td class="col-qty num">${cl.qty.toLocaleString('ru')}</td>`;
+      if(idx===0) html+=`<td rowspan="${rowspan}" class="col-capacity num">${c.capacity}</td>
+        <td rowspan="${rowspan}" class="col-fill num" style="color:${pct>=90?'#2e7d32':'#e65100'}">${pct}%</td>`;
       html+=`</tr>`;
     });
   }
