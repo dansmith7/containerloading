@@ -64,9 +64,12 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef0f5;color:#222;min-h
 .sum-card.ok .val{color:#2e7d32}
 
 /* tabs */
-.tab-bar{display:flex;gap:0;padding:0 16px;border-bottom:2px solid #dde;background:#fff}
+.tab-bar{display:flex;gap:0;padding:0 16px;border-bottom:2px solid #dde;background:#fff;align-items:center}
 .tab{padding:10px 20px;cursor:pointer;font-size:13px;font-weight:600;color:#888;border-bottom:3px solid transparent;margin-bottom:-2px;transition:.15s}
 .tab.active{color:#0d47a1;border-bottom-color:#0d47a1}
+.tab-spacer{flex:1}
+.btn-export-xls{border:1px solid #2e7d32;background:#e8f5e9;color:#2e7d32;border-radius:7px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
+.btn-export-xls:hover{background:#2e7d32;color:#fff}
 
 .tab-content{flex:1;padding:16px;display:none}
 .tab-content.active{display:block}
@@ -173,6 +176,8 @@ table.rt td.num{text-align:right;font-weight:700;color:#0d47a1}
         <div class="tab active" onclick="switchTab('table',this)">📋 Сводная таблица</div>
         <div class="tab" onclick="switchTab('visual',this)">🗃️ Схема контейнеров</div>
         <div class="tab" onclick="switchTab('spec',this)">📐 Справочник ёмкости</div>
+        <div class="tab-spacer"></div>
+        <button class="btn-export-xls" onclick="exportTableToExcel()" title="Скачать сводную таблицу">Excel</button>
       </div>
       <div class="tab-content active" id="tab-table">
         <div class="result-table-wrap" id="result-table-wrap"></div>
@@ -230,6 +235,7 @@ const VISUAL_LAYOUT = {
 let items = [];
 let nextId = 1;
 let mode = 'auto';
+let currentContainers = [];
 
 document.getElementById('hdr-date').textContent =
   new Date().toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});
@@ -482,6 +488,7 @@ function getTypeName(key){
 // ═══════════════════════════════════════════════════
 
 function renderResults(containers, msgs){
+  currentContainers = containers;
   document.getElementById('empty-state').style.display='none';
   const ra = document.getElementById('result-area');
   ra.style.display='flex';
@@ -691,6 +698,75 @@ function renderTable(containers){
   }
   html+=`</tbody></table>`;
   wrap.innerHTML=html;
+}
+
+function exportTableToExcel(){
+  if(!currentContainers.length){
+    alert('Сначала рассчитайте загрузку');
+    return;
+  }
+
+  const rows = [
+    ['№ Конт.', 'Тип', 'Состав груза', 'Кол-во', 'Ёмкость', 'Заполнено'],
+  ];
+
+  currentContainers.forEach(c=>{
+    const pct = Math.round(c.filled/c.capacity*100) + '%';
+    c.cargo.forEach(cl=>{
+      rows.push([
+        c.num,
+        c.mixed ? 'МИКС' : 'Чистый',
+        cl.label,
+        cl.qty,
+        c.capacity,
+        pct,
+      ]);
+    });
+  });
+
+  const tableRows = rows.map((row,idx)=>
+    '<tr>' + row.map(cell=>idx===0
+      ? `<th>${escapeHtml(cell)}</th>`
+      : `<td>${escapeHtml(cell)}</td>`
+    ).join('') + '</tr>'
+  ).join('');
+
+  const workbook = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px}
+th{background:#e8edf8;font-weight:700}
+th,td{border:1px solid #b7c4d6;padding:6px 10px;text-align:left}
+td:nth-child(4),td:nth-child(5),td:nth-child(6){text-align:right}
+</style>
+</head>
+<body>
+<table>${tableRows}</table>
+</body>
+</html>`;
+
+  const blob = new Blob(['\ufeff', workbook], {type:'application/vnd.ms-excel;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const date = new Date().toISOString().slice(0,10);
+  link.href = url;
+  link.download = `container-loading-${date}.xls`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function escapeHtml(value){
+  return String(value).replace(/[&<>"']/g, ch=>({
+    '&':'&amp;',
+    '<':'&lt;',
+    '>':'&gt;',
+    '"':'&quot;',
+    "'":'&#39;',
+  }[ch]));
 }
 
 function renderSpec(){
