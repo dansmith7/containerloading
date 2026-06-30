@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Схема загрузки контейнеров</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#eef0f5;color:#222;min-height:100vh;font-size:14px}
+
+/* ── HEADER ── */
+.header{background:linear-gradient(135deg,#0d47a1,#1565c0);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.header-icon{font-size:28px}
+.header h1{font-size:18px;font-weight:700;letter-spacing:.3px}
+.header p{font-size:12px;opacity:.8;margin-top:2px}
+.header-meta{margin-left:auto;display:flex;gap:8px}
+.badge{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
+
+/* ── LAYOUT ── */
+.app-body{display:flex;height:calc(100vh - 58px);overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{width:360px;min-width:360px;background:#fff;border-right:1px solid #dde;display:flex;flex-direction:column;overflow:hidden}
+.sb-top{padding:16px;border-bottom:1px solid #eee;background:#f7f8fc}
+.sb-top h2{font-size:13px;font-weight:700;color:#0d47a1;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.sb-top p{font-size:11px;color:#888}
+
+/* container type selector */
+.ctype-row{display:flex;gap:6px;margin:12px 16px 0}
+.ctype-btn{flex:1;padding:7px 4px;border:2px solid #ddd;border-radius:7px;background:#f7f8fc;cursor:pointer;font-size:12px;font-weight:600;color:#555;transition:.15s}
+.ctype-btn.active{border-color:#0d47a1;background:#e8edf8;color:#0d47a1}
+
+.cargo-list{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+
+.cargo-item{background:#f9fafc;border:1.5px solid #e2e5ef;border-radius:9px;padding:12px;position:relative;transition:.15s}
+.cargo-item:hover{border-color:#90a8d0}
+.cargo-item-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.item-num{width:22px;height:22px;background:#0d47a1;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.item-title{font-size:13px;font-weight:600;flex:1}
+.btn-del{background:none;border:none;color:#ccc;cursor:pointer;font-size:18px;line-height:1;padding:0 2px;transition:.15s}
+.btn-del:hover{color:#e53935}
+
+.field-row{display:grid;grid-template-columns:1fr 1fr 90px;gap:7px}
+.field-group label{display:block;font-size:10px;font-weight:700;color:#999;text-transform:uppercase;margin-bottom:3px;letter-spacing:.4px}
+.field-group select,.field-group input{width:100%;padding:7px 9px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;background:#fff;color:#222;outline:none;transition:.15s}
+.field-group select:focus,.field-group input:focus{border-color:#0d47a1}
+.field-group input[type=number]{text-align:right}
+
+.sb-footer{padding:12px 16px;border-top:1px solid #eee;display:flex;flex-direction:column;gap:8px}
+.btn-add{background:#fff;border:2px dashed #90a8d0;color:#0d47a1;padding:9px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s}
+.btn-add:hover{background:#e8edf8;border-color:#0d47a1}
+.btn-calc{background:linear-gradient(135deg,#0d47a1,#1565c0);color:#fff;border:none;padding:12px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;letter-spacing:.3px;transition:.15s;box-shadow:0 2px 8px rgba(13,71,161,.4)}
+.btn-calc:hover{filter:brightness(1.1)}
+
+/* ── MAIN ── */
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+
+/* summary bar */
+.summary-bar{display:flex;gap:12px;padding:16px;flex-wrap:wrap}
+.sum-card{background:#fff;border-radius:10px;padding:14px 18px;min-width:130px;box-shadow:0 1px 4px rgba(0,0,0,.07);text-align:center}
+.sum-card .val{font-size:28px;font-weight:800;color:#0d47a1;line-height:1}
+.sum-card .lbl{font-size:11px;color:#888;margin-top:4px}
+.sum-card.warn .val{color:#e65100}
+.sum-card.ok .val{color:#2e7d32}
+
+/* tabs */
+.tab-bar{display:flex;gap:0;padding:0 16px;border-bottom:2px solid #dde;background:#fff}
+.tab{padding:10px 20px;cursor:pointer;font-size:13px;font-weight:600;color:#888;border-bottom:3px solid transparent;margin-bottom:-2px;transition:.15s}
+.tab.active{color:#0d47a1;border-bottom-color:#0d47a1}
+
+.tab-content{flex:1;padding:16px;display:none}
+.tab-content.active{display:block}
+
+/* ── CONTAINER CARDS (visual tab) ── */
+.containers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+
+.con-card{background:#fff;border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,.08);overflow:hidden}
+.con-card-head{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#e8edf8;border-bottom:1px solid #c5cae9}
+.con-tag{background:#0d47a1;color:#fff;padding:4px 9px;border-radius:5px;font-size:11px;font-weight:800}
+.con-label{font-size:13px;font-weight:700;flex:1}
+.con-fill-pct{font-size:12px;color:#0d47a1;font-weight:700}
+
+.con-visual{padding:12px 14px 8px}
+.con-svg-wrap{position:relative}
+svg.container-svg{width:100%;display:block}
+
+.fill-bar-wrap{padding:0 14px 12px}
+.fill-bar{height:5px;background:#e0e0e0;border-radius:3px;overflow:hidden}
+.fill-bar-inner{height:100%;border-radius:3px;transition:.4s}
+
+.con-legend{padding:8px 14px 12px;display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid #f0f0f0}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#555}
+.leg-dot{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+
+/* ── TABLE TAB ── */
+.result-table-wrap{overflow-x:auto}
+table.rt{width:100%;border-collapse:collapse;font-size:13px}
+table.rt th{background:#e8edf8;padding:9px 12px;text-align:left;font-weight:700;border:1px solid #c5cae9;white-space:nowrap}
+table.rt td{padding:8px 12px;border:1px solid #e0e6ef;vertical-align:top}
+table.rt tr:nth-child(even) td{background:#f7f8fc}
+table.rt td.num{text-align:right;font-weight:700;color:#0d47a1}
+.color-pill{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+
+/* ── EMPTY STATE ── */
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#aaa;padding:40px}
+.empty-state .es-icon{font-size:60px;margin-bottom:16px;opacity:.5}
+.empty-state h3{font-size:17px;color:#888;margin-bottom:8px}
+.empty-state p{font-size:13px;text-align:center;max-width:320px;line-height:1.6}
+
+/* ── ALGO INFO PANEL ── */
+.algo-info{background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 14px;margin:0 16px 12px;font-size:12px;color:#795548;line-height:1.6}
+.algo-info strong{color:#e65100}
+
+/* ── SPEC PANEL ── */
+.spec-section{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);padding:16px;margin-bottom:14px}
+.spec-section h3{font-size:13px;font-weight:700;color:#0d47a1;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px}
+.spec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.spec-row{background:#f7f8fc;border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center}
+.spec-key{font-size:12px;color:#555}
+.spec-val{font-size:13px;font-weight:700;color:#0d47a1}
+
+/* ── PRINT ── */
+@media print{.sidebar,.tab-bar,.summary-bar{display:none}.main{height:auto}.tab-content{display:block!important}.containers-grid{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-icon">🚢</div>
+  <div>
+    <h1>Схема загрузки контейнеров</h1>
+    <p>Автоматическое распределение груза — Россия / Экспорт</p>
+  </div>
+  <div class="header-meta">
+    <span class="badge">40HQ</span>
+    <span class="badge" id="hdr-date"></span>
+  </div>
+</header>
+
+<div class="app-body">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <div class="sb-top">
+      <h2>📦 Состав груза</h2>
+      <p>Укажите тип, размер и количество единиц</p>
+    </div>
+
+    <div class="ctype-row">
+      <button class="ctype-btn active" onclick="setMode('auto')">🤖 Авто-оптимизация</button>
+      <button class="ctype-btn" onclick="setMode('manual')">🔧 Ручной режим</button>
+    </div>
+
+    <div class="cargo-list" id="cargo-list"></div>
+
+    <div class="sb-footer">
+      <button class="btn-add" onclick="addItem()">＋ Добавить позицию</button>
+      <button class="btn-calc" onclick="calculate()">🔄 Рассчитать загрузку</button>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN ═══ -->
+  <main class="main" id="main">
+    <div class="empty-state" id="empty-state">
+      <div class="es-icon">📦</div>
+      <h3>Введите состав груза</h3>
+      <p>Добавьте позиции слева и нажмите «Рассчитать загрузку» — система автоматически распределит груз по контейнерам 40HQ с визуальной схемой.</p>
+    </div>
+    <div id="result-area" style="display:none;flex-direction:column;flex:1">
+      <div class="summary-bar" id="summary-bar"></div>
+      <div id="algo-msg"></div>
+      <div class="tab-bar">
+        <div class="tab active" onclick="switchTab('table',this)">📋 Сводная таблица</div>
+        <div class="tab" onclick="switchTab('visual',this)">🗃️ Схема контейнеров</div>
+        <div class="tab" onclick="switchTab('spec',this)">📐 Справочник ёмкости</div>
+      </div>
+      <div class="tab-content active" id="tab-table">
+        <div class="result-table-wrap" id="result-table-wrap"></div>
+      </div>
+      <div class="tab-content" id="tab-visual">
+        <div class="containers-grid" id="containers-grid"></div>
+      </div>
+      <div class="tab-content" id="tab-spec">
+        <div id="spec-content"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  DATA MODEL
+// ═══════════════════════════════════════════════════
+
+const PRODUCT_TYPES = [
+  {id:'platform',   label:'Платформа'},
+  {id:'profdisplay',label:'Профдисплей'},
+  {id:'panel',      label:'Панель'},
+];
+
+// inches → capacity per 40HQ (double-stacked / двойной стеллаж)
+// Логика: нижний ярус + верхний ярус = полная ёмкость
+// Mixed 65+86: 86" только нижний ярус (62), 65" только верхний (80)
+const CAPACITY = {
+  platform:    { '65':160, '75':142, '86':124 },
+  profdisplay: { '43':160, '55':252, '65':160, '75':142, '86':124 },
+  panel:       { '65':160, '75':142, '86':124 },
+};
+
+// Mixed container: 65" + 86" in one 40HQ
+const MIX_65_86 = { '65': 80, '86': 62 };
+
+// Colors per inch size
+const COLORS = {
+  '43':'#43a047','55':'#00897b','65':'#1e88e5','75':'#8e24aa','86':'#e53935','any':'#fb8c00'
+};
+
+// Visual layout per size: {rows, left, right} — units per row per column
+const VISUAL_LAYOUT = {
+  '75': { leftPerRow:10, rightPerRow:12, leftRows:7, rightRows:6 },   // 70+72=142
+  '86': { leftPerRow:5,  rightPerRow:6,  leftRows:11,rightRows:6, splitRow:5 }, // see draw fn
+  '65': { leftPerRow:10, rightPerRow:10, leftRows:8, rightRows:8 },   // 160
+  '55': { leftPerRow:14, rightPerRow:14, leftRows:9, rightRows:9 },   // 252 (approx)
+  '43': { leftPerRow:10, rightPerRow:10, leftRows:8, rightRows:8 },
+};
+
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+let items = [];
+let nextId = 1;
+let mode = 'auto';
+
+document.getElementById('hdr-date').textContent =
+  new Date().toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+// ═══════════════════════════════════════════════════
+//  UI — CARGO INPUT
+// ═══════════════════════════════════════════════════
+
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('.ctype-btn').forEach((b,i)=>b.classList.toggle('active',i===(m==='auto'?0:1)));
+}
+
+function addItem(type='platform', size='65', qty=0){
+  const id = nextId++;
+  items.push({id, type, size, qty});
+  renderList();
+  // auto-focus the qty field of the new item
+  setTimeout(()=>{
+    const el = document.getElementById('qty-'+id);
+    if(el) el.focus();
+  },50);
+}
+
+function removeItem(id){
+  items = items.filter(i=>i.id!==id);
+  renderList();
+}
+
+function getItemSizes(type){
+  const cap = CAPACITY[type] || CAPACITY.platform;
+  return Object.keys(cap).filter(k=>k!=='any');
+}
+
+function renderList(){
+  const el = document.getElementById('cargo-list');
+  if(items.length===0){
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb;font-size:13px">Нажмите «Добавить позицию»</div>';
+    return;
+  }
+  el.innerHTML = items.map((item,idx)=>{
+    const sizeOpts = getItemSizes(item.type).map(s=>
+      `<option value="${s}" ${item.size===s?'selected':''}>${s}"</option>`
+    ).join('');
+    const typeOpts = PRODUCT_TYPES.map(t=>
+      `<option value="${t.id}" ${item.type===t.id?'selected':''}>${t.label}</option>`
+    ).join('');
+    return `
+    <div class="cargo-item" id="item-${item.id}">
+      <div class="cargo-item-head">
+        <div class="item-num">${idx+1}</div>
+        <div class="item-title" style="color:${COLORS[item.size]||'#333'}">
+          ${PRODUCT_TYPES.find(t=>t.id===item.type)?.label||''} ${item.size}"
+        </div>
+        <button class="btn-del" onclick="removeItem(${item.id})" title="Удалить">×</button>
+      </div>
+      <div class="field-row">
+        <div class="field-group">
+          <label>Тип</label>
+          <select onchange="updateItem(${item.id},'type',this.value)">${typeOpts}</select>
+        </div>
+        <div class="field-group">
+          <label>Размер</label>
+          <select onchange="updateItem(${item.id},'size',this.value)">${sizeOpts}</select>
+        </div>
+        <div class="field-group">
+          <label>Кол-во</label>
+          <input type="number" id="qty-${item.id}" min="0" value="${item.qty||''}"
+            placeholder="0"
+            onchange="updateItem(${item.id},'qty',+this.value)"
+            oninput="updateItem(${item.id},'qty',+this.value)">
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateItem(id, field, val){
+  const item = items.find(i=>i.id===id);
+  if(!item) return;
+  item[field] = val;
+  // if type changed, reset size to first available
+  if(field==='type'){
+    const sizes = getItemSizes(val);
+    if(!sizes.includes(item.size)) item.size = sizes[0];
+    renderList();
+  }else if(field==='size'){
+    // re-render to update title color
+    renderList();
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  ALGORITHM
+// ═══════════════════════════════════════════════════
+
+function calculate(){
+  const valid = items.filter(i=>i.qty>0);
+  if(!valid.length){
+    alert('Укажите количество хотя бы для одной позиции');
+    return;
+  }
+
+  const containers = [];
+  let msgs = [];
+
+  if(mode==='auto'){
+    // Group by type+size
+    let groups = {};
+    for(const item of valid){
+      const key = item.type+'|'+item.size;
+      groups[key] = (groups[key]||0) + item.qty;
+    }
+
+    // Check if we have both 65" and 86" non-profile cargo, then apply MIX
+    // only when it reduces the total number of containers.
+    const size65Keys = Object.keys(groups).filter(k=>k.endsWith('|65') && !k.startsWith('profile|'));
+    const size86Keys = Object.keys(groups).filter(k=>k.endsWith('|86') && !k.startsWith('profile|'));
+    const total65 = size65Keys.reduce((s,k)=>s+groups[k],0);
+    const total86 = size86Keys.reduce((s,k)=>s+groups[k],0);
+
+    if(total65>0 && total86>0){
+      const mixPlan = findBestMixPlan(groups, size65Keys, size86Keys);
+      if(mixPlan && mixPlan.saving>0){
+        groups = mixPlan.remainingGroups;
+        msgs.push(`Смешанная загрузка 65"+86": сэкономлено <strong>${mixPlan.saving} конт.</strong> по сравнению с чистой загрузкой`);
+        for(const mixedCargo of mixPlan.mixedContainers){
+          containers.push({
+            id: containers.length+1, type:'40HQ', mixed:true,
+            cargo: mixedCargo,
+            capacity: MIX_65_86['65']+MIX_65_86['86'],
+            filled: mixedCargo.reduce((s,c)=>s+c.qty,0),
+          });
+        }
+      }
+    }
+
+    // Now fill remaining groups into pure containers
+    for(const [key, total] of Object.entries(groups)){
+      if(total<=0) continue;
+      const [type, size] = key.split('|');
+      const cap = (CAPACITY[type]||CAPACITY.platform)[size] || 100;
+      const label = getTypeName(key)+' '+size+'"';
+      const color = COLORS[size]||'#999';
+      let rem = total;
+      while(rem>0){
+        const fill = Math.min(rem, cap);
+        containers.push({
+          id:containers.length+1, type:'40HQ', mixed:false,
+          cargo:[{label, size, qty:fill, color}],
+          capacity:cap, filled:fill,
+        });
+        rem-=fill;
+      }
+    }
+
+  }else{
+    // Manual: one container per line (for preview)
+    for(const item of valid){
+      const cap = (CAPACITY[item.type]||CAPACITY.platform)[item.size] || 142;
+      let rem=item.qty;
+      while(rem>0){
+        const fill=Math.min(rem,cap);
+        containers.push({
+          id:containers.length+1, type:'40HQ', mixed:false,
+          cargo:[{label:PRODUCT_TYPES.find(t=>t.id===item.type)?.label+' '+item.size+'"', size:item.size, qty:fill, color:COLORS[item.size]||'#999'}],
+          capacity:cap, filled:fill,
+        });
+        rem-=fill;
+      }
+    }
+  }
+
+  // Number containers
+  containers.forEach((c,i)=>c.num='40HQ-'+(i+1));
+  renderResults(containers, msgs);
+}
+
+function findBestMixPlan(groups, size65Keys, size86Keys){
+  const total65 = size65Keys.reduce((s,k)=>s+groups[k],0);
+  const total86 = size86Keys.reduce((s,k)=>s+groups[k],0);
+  const pureNeeded = countPureContainers(groups, [...size65Keys, ...size86Keys]);
+  const maxMixed = Math.min(
+    Math.ceil(total65 / MIX_65_86['65']),
+    Math.ceil(total86 / MIX_65_86['86'])
+  );
+
+  let best = null;
+  for(let mixedCount=1; mixedCount<=maxMixed; mixedCount++){
+    const plan = buildMixPlan(groups, size65Keys, size86Keys, mixedCount);
+    const remainingNeeded = countPureContainers(plan.remainingGroups, [...size65Keys, ...size86Keys]);
+    const needed = mixedCount + remainingNeeded;
+    if(!best || needed < best.needed || (needed===best.needed && mixedCount<best.mixedCount)){
+      best = {...plan, mixedCount, needed, saving:pureNeeded-needed};
+    }
+  }
+  return best && best.saving>0 ? best : null;
+}
+
+function buildMixPlan(groups, size65Keys, size86Keys, mixedCount){
+  const remainingGroups = {...groups};
+  const mixedContainers = Array.from({length:mixedCount},()=>[]);
+
+  distributeMixCargo(remainingGroups, size65Keys, mixedContainers, '65');
+  distributeMixCargo(remainingGroups, size86Keys, mixedContainers, '86');
+
+  return {remainingGroups, mixedContainers};
+}
+
+function distributeMixCargo(remainingGroups, keys, mixedContainers, size){
+  const perContainer = MIX_65_86[size];
+  for(const mixedCargo of mixedContainers){
+    let space = perContainer;
+    for(const key of keys){
+      if(space<=0) break;
+      const qty = Math.min(remainingGroups[key] || 0, space);
+      if(qty<=0) continue;
+      const label = `${getTypeName(key)} ${size}"`;
+      const existing = mixedCargo.find(c=>c.label===label && c.size===size);
+      if(existing) existing.qty += qty;
+      else mixedCargo.push({label, size, qty, color:COLORS[size]});
+      remainingGroups[key] -= qty;
+      space -= qty;
+    }
+  }
+}
+
+function countPureContainers(groups, keys){
+  return keys.reduce((sum,key)=>{
+    const qty = groups[key] || 0;
+    if(qty<=0) return sum;
+    const [type, size] = key.split('|');
+    const cap = (CAPACITY[type]||CAPACITY.platform)[size] || 100;
+    return sum + Math.ceil(qty/cap);
+  },0);
+}
+
+function getTypeName(key){
+  const [type] = key.split('|');
+  return PRODUCT_TYPES.find(t=>t.id===type)?.label || type;
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER RESULTS
+// ═══════════════════════════════════════════════════
+
+function renderResults(containers, msgs){
+  document.getElementById('empty-state').style.display='none';
+  const ra = document.getElementById('result-area');
+  ra.style.display='flex';
+
+  // Summary cards
+  const totalUnits = containers.reduce((s,c)=>s+c.filled,0);
+  const avgFill = containers.length ? Math.round(containers.reduce((s,c)=>s+c.filled/c.capacity*100,0)/containers.length) : 0;
+  const mixedCount = containers.filter(c=>c.mixed).length;
+
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="sum-card"><div class="val">${containers.length}</div><div class="lbl">Контейнеров 40HQ</div></div>
+    <div class="sum-card"><div class="val">${totalUnits.toLocaleString('ru')}</div><div class="lbl">Единиц груза</div></div>
+    <div class="sum-card ${avgFill>=90?'ok':''}"><div class="val">${avgFill}%</div><div class="lbl">Ср. заполненность</div></div>
+    <div class="sum-card"><div class="val">${mixedCount}</div><div class="lbl">Смешанных конт.</div></div>
+  `;
+
+  // Algorithm message
+  document.getElementById('algo-msg').innerHTML = msgs.length
+    ? `<div class="algo-info">💡 ${msgs.join(' | ')}</div>` : '';
+
+  // Visual tab
+  renderVisual(containers);
+
+  // Table tab
+  renderTable(containers);
+
+  // Spec tab
+  renderSpec();
+}
+
+function renderVisual(containers){
+  const grid = document.getElementById('containers-grid');
+  grid.innerHTML = containers.map(c=>{
+    const pct = Math.round(c.filled/c.capacity*100);
+    const fillColor = pct>=90 ? '#4caf50' : pct>=60 ? '#ff9800' : '#2196f3';
+    const svgHtml = drawContainerSVG(c);
+    const legend = c.cargo.map(cl=>
+      `<div class="leg-item"><div class="leg-dot" style="background:${cl.color}"></div>${cl.label}: <b>${cl.qty} шт.</b></div>`
+    ).join('');
+
+    return `
+    <div class="con-card">
+      <div class="con-card-head">
+        <div class="con-tag">${c.num}</div>
+        <div class="con-label">${c.mixed?'МИКС 65"+86"':'40HQ'}</div>
+        <div class="con-fill-pct">${pct}%</div>
+      </div>
+      <div class="con-visual">${svgHtml}</div>
+      <div class="fill-bar-wrap">
+        <div class="fill-bar"><div class="fill-bar-inner" style="width:${pct}%;background:${fillColor}"></div></div>
+      </div>
+      <div class="con-legend">${legend}</div>
+    </div>`;
+  }).join('');
+}
+
+function drawContainerSVG(container){
+  const W=240, H=320;
+  const pad=10, colGap=8;
+  const colW=(W-pad*2-colGap)/2;
+  let svg=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="container-svg">`;
+
+  // Container shell
+  svg+=`<rect x="2" y="2" width="${W-4}" height="${H-4}" rx="6" fill="#b0bec5" stroke="#455a64" stroke-width="2.5"/>`;
+  // Inner cargo area
+  const innerY=pad+14, innerH=H-pad*2-20;
+  svg+=`<rect x="${pad}" y="${innerY}" width="${W-pad*2}" height="${innerH}" rx="3" fill="#eceff1"/>`;
+  // Container label strip at top
+  svg+=`<rect x="${pad}" y="${pad}" width="${W-pad*2}" height="12" rx="2" fill="#546e7a"/>`;
+  svg+=`<text x="${W/2}" y="${pad+9}" text-anchor="middle" font-size="8" fill="white" font-weight="700" letter-spacing="1">40HQ</text>`;
+
+  // Center divider line
+  const cx=pad+colW+colGap/2;
+  svg+=`<line x1="${cx}" y1="${innerY}" x2="${cx}" y2="${innerY+innerH}" stroke="#90a4ae" stroke-width="1" stroke-dasharray="3,3"/>`;
+
+  // Compute layout per cargo type
+  const sizes = container.cargo.map(c=>c.size);
+  const primarySize = sizes[0];
+  const layout = VISUAL_LAYOUT[primarySize] || {leftPerRow:10,rightPerRow:10,leftRows:8,rightRows:8};
+
+  // For each cargo segment, draw rows
+  let usedRowsLeft=0, usedRowsRight=0;
+  const rowH = innerH / Math.max(layout.leftRows, layout.rightRows, 1);
+
+  for(const cargo of container.cargo){
+    const frac = cargo.qty / container.capacity;
+    const totalRows = Math.max(layout.leftRows, layout.rightRows);
+    const allocatedRows = Math.ceil(frac * totalRows);
+
+    // Left column rows
+    const leftFill = Math.min(allocatedRows, layout.leftRows - usedRowsLeft);
+    for(let r=0; r<leftFill; r++){
+      const ry = innerY + innerH - (usedRowsLeft+r+1)*rowH;
+      const rh = rowH-1.5;
+      svg+=`<rect x="${pad+1}" y="${ry}" width="${colW-2}" height="${rh}" rx="2" fill="${cargo.color}" opacity="${r===0&&usedRowsLeft===0?'.95':'.85'}"/>`;
+      // Row count label
+      const unitsInRow = r===leftFill-1 && cargo.qty%(layout.leftPerRow)||0 || layout.leftPerRow;
+      svg+=`<text x="${pad+colW/2}" y="${ry+rh/2+3.5}" text-anchor="middle" font-size="9" fill="white" font-weight="700">${layout.leftPerRow}</text>`;
+    }
+    usedRowsLeft+=leftFill;
+
+    // Right column rows
+    const rightFill = Math.min(allocatedRows, layout.rightRows - usedRowsRight);
+    for(let r=0; r<rightFill; r++){
+      const ry = innerY + innerH - (usedRowsRight+r+1)*rowH;
+      const rh = rowH-1.5;
+      svg+=`<rect x="${cx+colGap/2+1}" y="${ry}" width="${colW-2}" height="${rh}" rx="2" fill="${cargo.color}" opacity=".95"/>`;
+      svg+=`<text x="${cx+colGap/2+colW/2}" y="${ry+rh/2+3.5}" text-anchor="middle" font-size="9" fill="white" font-weight="700">${layout.rightPerRow}</text>`;
+    }
+    usedRowsRight+=rightFill;
+  }
+
+  // Row separator lines (like reference image)
+  const totalRows = Math.max(layout.leftRows, layout.rightRows);
+  for(let r=1; r<totalRows; r++){
+    const ly = innerY + innerH - r*rowH;
+    svg+=`<line x1="${pad}" y1="${ly}" x2="${pad+colW}" y2="${ly}" stroke="rgba(255,255,255,.35)" stroke-width="1"/>`;
+    svg+=`<line x1="${cx+colGap/2}" y1="${ly}" x2="${cx+colGap/2+colW}" y2="${ly}" stroke="rgba(255,255,255,.35)" stroke-width="1"/>`;
+  }
+
+  // Mid-height line = boundary between upper and lower PALLET TIER (双层)
+  // Lower tier = bottom half, Upper tier = top half
+  const midY = innerY + innerH/2;
+  svg+=`<line x1="${pad}" y1="${midY}" x2="${W-pad}" y2="${midY}" stroke="#fff" stroke-width="2" stroke-dasharray="5,3" opacity=".7"/>`;
+  svg+=`<text x="${W-pad-2}" y="${midY-3}" text-anchor="end" font-size="8" fill="white" opacity=".9">Ярус 2 ↑</text>`;
+  svg+=`<text x="${W-pad-2}" y="${midY+10}" text-anchor="end" font-size="8" fill="white" opacity=".9">Ярус 1 ↓</text>`;
+
+  // Door at bottom
+  svg+=`<rect x="${pad}" y="${innerY+innerH+2}" width="${W-pad*2}" height="6" rx="2" fill="#78909c"/>`;
+  svg+=`<line x1="${W/2}" y1="${innerY+innerH+2}" x2="${W/2}" y2="${innerY+innerH+8}" stroke="#546e7a" stroke-width="1.5"/>`;
+
+  svg+=`</svg>`;
+  return svg;
+}
+
+function renderTable(containers){
+  const wrap = document.getElementById('result-table-wrap');
+  let html=`<table class="rt">
+  <thead><tr>
+    <th>№ Конт.</th><th>Тип</th><th>Состав груза</th><th>Кол-во</th><th>Ёмкость</th><th>Заполнено</th>
+  </tr></thead><tbody>`;
+
+  for(const c of containers){
+    const pct=Math.round(c.filled/c.capacity*100);
+    const rowspan=c.cargo.length;
+    c.cargo.forEach((cl,idx)=>{
+      html+=`<tr>`;
+      if(idx===0) html+=`<td rowspan="${rowspan}" style="font-weight:700;color:#0d47a1">${c.num}</td>
+        <td rowspan="${rowspan}">${c.mixed?'МИКС':'Чистый'}</td>`;
+      html+=`<td><span class="color-pill" style="background:${cl.color}"></span>${cl.label}</td>
+        <td class="num">${cl.qty.toLocaleString('ru')}</td>`;
+      if(idx===0) html+=`<td rowspan="${rowspan}" class="num">${c.capacity}</td>
+        <td rowspan="${rowspan}" class="num" style="color:${pct>=90?'#2e7d32':'#e65100'}">${pct}%</td>`;
+      html+=`</tr>`;
+    });
+  }
+  html+=`</tbody></table>`;
+  wrap.innerHTML=html;
+}
+
+function renderSpec(){
+  const el = document.getElementById('spec-content');
+  el.innerHTML = `
+  <div class="spec-section">
+    <h3>Ёмкость 40HQ — Один тип груза</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:10px">Платформа / Профдисплей / Панель — одинаковые нормы на размер. Двойной стеллаж (2 яруса).</p>
+    <div class="spec-grid">
+      ${specRow('Профдисплей 43"','~160 шт.','43')}
+      ${specRow('Профдисплей 55"','252 шт.','55')}
+      ${specRow('Все типы 65"','160 шт. (80×2)','65')}
+      ${specRow('Все типы 75"','142 шт. (71×2)','75')}
+      ${specRow('Все типы 86"','124 шт. (62×2)','86')}
+    </div>
+  </div>
+  <div class="spec-section">
+    <h3>Ёмкость 40HQ — Смешанная загрузка (65" + 86")</h3>
+    <div class="spec-grid">
+      ${specRow('65" в смешанном конт.','80 шт.','65')}
+      ${specRow('86" в смешанном конт.','62 шт.','86')}
+      ${specRow('Итого на контейнер','142 ед.',null,'#546e7a')}
+    </div>
+    <p style="font-size:11px;color:#888;margin-top:8px">Применяется только при наличии обоих размеров. Система автоматически рассчитывает выгоду смешения.</p>
+  </div>
+  <div class="spec-section">
+    <h3>Расположение в контейнере (двойной стеллаж)</h3>
+    <div class="spec-grid">
+      ${specRow('75" — левая колонна','10 шт./ряд × 7 рядов','75')}
+      ${specRow('75" — правая колонна','12 шт./ряд × 6 рядов','75')}
+      ${specRow('86" — левая колонна','5 шт./ряд','86')}
+      ${specRow('86" — правая колонна','6 шт./ряд','86')}
+      ${specRow('65" (микс) — стек','5+6 шт./ряд × 7 рядов','65')}
+    </div>
+  </div>
+  <div class="spec-section">
+    <h3>Типы контейнеров</h3>
+    <div class="spec-grid">
+      ${specRow('40HQ (High Cube)','Длина 12.03м, В 2.70м',null,'#0d47a1')}
+      ${specRow('Внутренний объём','76.3 м³',null,'#0d47a1')}
+      ${specRow('Макс. полезная нагрузка','26 300 кг',null,'#0d47a1')}
+    </div>
+  </div>`;
+}
+
+function specRow(key, val, size, color){
+  const c = color || (size ? COLORS[size] : '#0d47a1');
+  return `<div class="spec-row"><span class="spec-key">${key}</span><span class="spec-val" style="color:${c}">${val}</span></div>`;
+}
+
+// ═══════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════
+function switchTab(id, el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════
+//  INIT — pre-fill example cargo from manifest
+// ═══════════════════════════════════════════════════
+(function init(){
+  // Pre-fill with real example data from manifest (манифест P2511056JG + P2511021JG)
+  addItem('platform',  '75', 142);  // CIMU0835304: 75SL платформа
+  addItem('profdisplay','55', 282); // SORU4011710 + THKU: 55DHR дисплей
+  addItem('profdisplay','65', 56);  // THKU: 65DHR дисплей
+  addItem('panel',     '65', 181);  // CICU: 65SL панель (80+14+87)
+  addItem('panel',     '75', 128);  // CICU: 75SL панель
+  addItem('panel',     '86', 62);   // CICU: 86SL панель
+  renderList();
+})();
+</script>
+</body>
+</html>
