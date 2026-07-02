@@ -304,6 +304,26 @@ const CAPACITY = {
 // Mixed container: 65" + 86" in one 40HQ
 const MIX_65_86 = { '65': 80, '86': 62 };
 
+// Confirmed loading templates from real PL/container matrices.
+const CONFIRMED_LOADING_TEMPLATES = [
+  {
+    id:'mix65_86',
+    label:'МИКС 65"+86"',
+    slots:[
+      {size:'65', qty:MIX_65_86['65']},
+      {size:'86', qty:MIX_65_86['86']},
+    ],
+  },
+  {
+    id:'residual75_86',
+    label:'Остаток 75"+86"',
+    slots:[
+      {size:'75', qty:133},
+      {size:'86', qty:3},
+    ],
+  },
+];
+
 // Colors per inch size
 const COLORS = {
   '43':'#43a047','55':'#00897b','65':'#1e88e5','75':'#8e24aa','86':'#e53935','any':'#fb8c00'
@@ -445,25 +465,20 @@ function calculate(){
       groups[key] = (groups[key]||0) + item.qty;
     }
 
-    // Check if we have both 65" and 86" non-profile cargo, then apply MIX
-    // only when it reduces the total number of containers.
-    const size65Keys = Object.keys(groups).filter(k=>k.endsWith('|65') && !k.startsWith('profile|'));
-    const size86Keys = Object.keys(groups).filter(k=>k.endsWith('|86') && !k.startsWith('profile|'));
-    const total65 = size65Keys.reduce((s,k)=>s+groups[k],0);
-    const total86 = size86Keys.reduce((s,k)=>s+groups[k],0);
-
-    if(total65>0 && total86>0){
-      const mixPlan = findBestMixPlan(groups, size65Keys, size86Keys);
-      if(mixPlan && mixPlan.saving>0){
-        groups = mixPlan.remainingGroups;
-        for(const mixedCargo of mixPlan.mixedContainers){
-          containers.push({
-            id: containers.length+1, type:'40HQ', mixed:true,
-            cargo: mixedCargo,
-            capacity: MIX_65_86['65']+MIX_65_86['86'],
-            filled: mixedCargo.reduce((s,c)=>s+c.qty,0),
-          });
-        }
+    // Apply confirmed mixed/residual loading templates only when they reduce
+    // the total number of containers versus pure loading.
+    for(const template of CONFIRMED_LOADING_TEMPLATES){
+      const plan = findBestTemplatePlan(groups, template);
+      if(!plan) continue;
+      groups = plan.remainingGroups;
+      for(const cargo of plan.templateContainers){
+        containers.push({
+          id: containers.length+1, type:'40HQ', mixed:true,
+          templateId: template.id, templateLabel: template.label,
+          cargo,
+          capacity: getTemplateCapacity(template),
+          filled: cargo.reduce((s,c)=>s+c.qty,0),
+        });
       }
     }
 
@@ -508,53 +523,67 @@ function calculate(){
   renderResults(containers, msgs);
 }
 
-function findBestMixPlan(groups, size65Keys, size86Keys){
-  const total65 = size65Keys.reduce((s,k)=>s+groups[k],0);
-  const total86 = size86Keys.reduce((s,k)=>s+groups[k],0);
-  const pureNeeded = countPureContainers(groups, [...size65Keys, ...size86Keys]);
-  const maxMixed = Math.min(
-    Math.ceil(total65 / MIX_65_86['65']),
-    Math.ceil(total86 / MIX_65_86['86'])
-  );
+function findBestTemplatePlan(groups, template){
+  const keysBySize = {};
+  const totalsBySize = {};
+  for(const slot of template.slots){
+    keysBySize[slot.size] = getGroupKeysBySize(groups, slot.size);
+    totalsBySize[slot.size] = keysBySize[slot.size].reduce((s,k)=>s+groups[k],0);
+    if(totalsBySize[slot.size]<=0) return null;
+  }
+
+  const involvedKeys = Object.values(keysBySize).flat();
+  const pureNeeded = countPureContainers(groups, involvedKeys);
+  const maxTemplates = Math.min(...template.slots.map(slot=>
+    Math.ceil(totalsBySize[slot.size] / slot.qty)
+  ));
 
   let best = null;
-  for(let mixedCount=1; mixedCount<=maxMixed; mixedCount++){
-    const plan = buildMixPlan(groups, size65Keys, size86Keys, mixedCount);
-    const remainingNeeded = countPureContainers(plan.remainingGroups, [...size65Keys, ...size86Keys]);
-    const needed = mixedCount + remainingNeeded;
-    if(!best || needed < best.needed || (needed===best.needed && mixedCount<best.mixedCount)){
-      best = {...plan, mixedCount, needed, saving:pureNeeded-needed};
+  for(let templateCount=1; templateCount<=maxTemplates; templateCount++){
+    const plan = buildTemplatePlan(groups, template, keysBySize, templateCount);
+    const remainingNeeded = countPureContainers(plan.remainingGroups, involvedKeys);
+    const needed = templateCount + remainingNeeded;
+    if(!best || needed < best.needed || (needed===best.needed && templateCount<best.templateCount)){
+      best = {...plan, templateCount, needed, saving:pureNeeded-needed};
     }
   }
   return best && best.saving>0 ? best : null;
 }
 
-function buildMixPlan(groups, size65Keys, size86Keys, mixedCount){
+function buildTemplatePlan(groups, template, keysBySize, templateCount){
   const remainingGroups = {...groups};
-  const mixedContainers = Array.from({length:mixedCount},()=>[]);
+  const templateContainers = Array.from({length:templateCount},()=>[]);
 
-  distributeMixCargo(remainingGroups, size65Keys, mixedContainers, '65');
-  distributeMixCargo(remainingGroups, size86Keys, mixedContainers, '86');
+  for(const slot of template.slots){
+    distributeTemplateCargo(remainingGroups, keysBySize[slot.size], templateContainers, slot);
+  }
 
-  return {remainingGroups, mixedContainers};
+  return {remainingGroups, templateContainers};
 }
 
-function distributeMixCargo(remainingGroups, keys, mixedContainers, size){
-  const perContainer = MIX_65_86[size];
-  for(const mixedCargo of mixedContainers){
-    let space = perContainer;
+function distributeTemplateCargo(remainingGroups, keys, templateContainers, slot){
+  for(const cargoList of templateContainers){
+    let space = slot.qty;
     for(const key of keys){
       if(space<=0) break;
       const qty = Math.min(remainingGroups[key] || 0, space);
       if(qty<=0) continue;
-      const label = `${getTypeName(key)} ${size}"`;
-      const existing = mixedCargo.find(c=>c.label===label && c.size===size);
+      const label = `${getTypeName(key)} ${slot.size}"`;
+      const existing = cargoList.find(c=>c.label===label && c.size===slot.size);
       if(existing) existing.qty += qty;
-      else mixedCargo.push({label, size, qty, color:COLORS[size]});
+      else cargoList.push({label, size:slot.size, qty, color:COLORS[slot.size]});
       remainingGroups[key] -= qty;
       space -= qty;
     }
   }
+}
+
+function getGroupKeysBySize(groups, size){
+  return Object.keys(groups).filter(k=>k.endsWith('|'+size));
+}
+
+function getTemplateCapacity(template){
+  return template.slots.reduce((sum,slot)=>sum+slot.qty,0);
 }
 
 function countPureContainers(groups, keys){
@@ -620,7 +649,7 @@ function renderVisual(containers){
     <div class="con-card">
       <div class="con-card-head">
         <div class="con-tag">${c.num}</div>
-        <div class="con-label">${c.mixed?'МИКС 65"+86"':'40HQ'}</div>
+        <div class="con-label">${c.templateLabel || (c.mixed?'МИКС':'40HQ')}</div>
         <div class="con-fill-pct">${pct}%</div>
       </div>
       <div class="con-visual">${svgHtml}</div>
@@ -633,7 +662,7 @@ function renderVisual(containers){
 }
 
 function drawContainerSVG(container){
-  if(container.mixed) return drawMixedContainerSVG(container);
+  if(container.templateId==='mix65_86') return drawMixedContainerSVG(container);
 
   const W=240, H=320;
   const pad=10, colGap=8;
@@ -892,6 +921,14 @@ function renderSpec(){
       ${specRow('Итого на контейнер','142 ед.',null,'#546e7a')}
     </div>
     <p style="font-size:11px;color:#888;margin-top:8px">Применяется только при наличии обоих размеров. Система автоматически рассчитывает выгоду смешения.</p>
+  </div>
+  <div class="spec-section">
+    <h3>Подтверждённые шаблоны остатков</h3>
+    <div class="spec-grid">
+      ${specRow('МИКС 65"+86"','80 × 65" + 62 × 86"','65')}
+      ${specRow('Остаток 75"+86"','133 × 75" + 3 × 86"','75')}
+    </div>
+    <p style="font-size:11px;color:#888;margin-top:8px">Шаблоны применяются только если уменьшают число контейнеров по сравнению с чистой загрузкой.</p>
   </div>
   <div class="spec-section">
     <h3>Расположение в контейнере (двойной стеллаж)</h3>
